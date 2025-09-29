@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class AuthRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        switch ($this->route()->getName()) {
+            case 'auth.signup':
+                return [
+                    'name' => 'required|string|max:255',
+                    'email' => 'required|email|unique:users,email',
+                    'password' => 'required|min:6|confirmed',
+                ];
+
+            case 'auth.signin':
+                return [
+                    'email' => 'required|email',
+                    'password' => 'required|min:6',
+                ];
+
+            default:
+                return [];
+        }
+    }
+}

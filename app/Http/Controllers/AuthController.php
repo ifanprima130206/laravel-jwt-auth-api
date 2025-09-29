@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\AuthRequest;
 use App\Services\AuthService;
 use App\Http\Resources\UserResource;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -16,35 +17,42 @@ class AuthController extends Controller
         $this->authService = $authService;
     }
 
-    public function signin(Request $request)
+    public function signin(AuthRequest $request)
     {
-        $credentials = $request->only('email', 'password');
-        $result = $this->authService->login($credentials);
+        try {
+            $credentials = $request->only('email', 'password');
+            $result = $this->authService->login($credentials);
 
-        if (!$result) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+            if (!$result) {
+                return response()->json(['error' => 'Email atau password salah'], 401);
+            }
+
+            return response()->json([
+                'user' => new UserResource($result['user']),
+                'access_token' => $result['token'],
+                'token_type' => 'Bearer',
+                'expires_in' => Auth::factory()->getTTL() * 60,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-
-        return response()->json([
-            'access_token' => $result['token'],
-            'token_type' => 'Bearer',
-            'expires_in' => Auth::factory()->getTTL() * 60,
-            'user' => new UserResource($result['user'])
-        ]);
     }
 
-    public function signup(Request $request)
+    public function signup(AuthRequest $request)
     {
-        $data = $request->only('name', 'email', 'password');
-        $result = $this->authService->register($data);
+        try {
+            $data = $request->only('name', 'email', 'password');
+            $result = $this->authService->register($data);
 
-        return response()->json([
-            'access_token' => $result['token'],
-            'token_type' => 'Bearer',
-            'expires_in' => Auth::factory()->getTTL() * 60,
-            'user' => new UserResource($result['user']),
-            'password' => $result['password'] // testing only
-        ]);
+            return response()->json([
+                'user' => new UserResource($result['user']),
+                'access_token' => $result['token'],
+                'token_type' => 'Bearer',
+                'expires_in' => Auth::factory()->getTTL() * 60,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function me()
@@ -60,13 +68,17 @@ class AuthController extends Controller
 
     public function refresh()
     {
-        $result = $this->authService->refresh();
+        try {
+            $result = $this->authService->refresh();
 
-        return response()->json([
-            'access_token' => $result['token'],
-            'token_type' => 'Bearer',
-            'expires_in' => Auth::factory()->getTTL() * 60,
-            'user' => new UserResource($result['user'])
-        ]);
+            return response()->json([
+                'user' => new UserResource($result['user']),
+                'access_token' => $result['token'],
+                'token_type' => 'Bearer',
+                'expires_in' => Auth::factory()->getTTL() * 60,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }
