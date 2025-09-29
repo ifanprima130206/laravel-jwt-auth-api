@@ -6,7 +6,6 @@ use App\Http\Requests\AuthRequest;
 use App\Services\AuthService;
 use App\Http\Resources\UserResource;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -19,66 +18,97 @@ class AuthController extends Controller
 
     public function signin(AuthRequest $request)
     {
-        try {
-            $credentials = $request->only('email', 'password');
-            $result = $this->authService->login($credentials);
+        $credentials = $request->only('email', 'password');
+        $result = $this->authService->login($credentials);
 
-            if (!$result) {
-                return response()->json(['error' => 'Email atau password salah'], 401);
-            }
-
-            return response()->json([
-                'user' => new UserResource($result['user']),
-                'access_token' => $result['token'],
-                'token_type' => 'Bearer',
-                'expires_in' => Auth::factory()->getTTL() * 60,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+        if (!$result) {
+            return response()->json(['error' => 'Email atau password salah'], 401);
         }
+
+        $expiresIn = Auth::factory()->getTTL() * 60;
+
+        return response()->json([
+            'user' => new UserResource($result['user']),
+            'access_token' => $result['token'],
+            'token_type' => 'Bearer',
+            'expires_in' => $expiresIn,
+        ])->cookie(
+            'access_token',
+            $result['token'],
+            $expiresIn / 60,
+            '/',
+            null,
+            true,
+            true,
+            false,
+            'Lax'
+        );
     }
 
     public function signup(AuthRequest $request)
     {
-        try {
-            $data = $request->only('name', 'email', 'password');
-            $result = $this->authService->register($data);
+        $data = $request->only('name', 'email', 'password');
+        $result = $this->authService->register($data);
+        $expiresIn = Auth::factory()->getTTL() * 60;
 
-            return response()->json([
-                'user' => new UserResource($result['user']),
-                'access_token' => $result['token'],
-                'token_type' => 'Bearer',
-                'expires_in' => Auth::factory()->getTTL() * 60,
-            ]);
+        return response()->json([
+            'user' => new UserResource($result['user']),
+            'access_token' => $result['token'],
+            'token_type' => 'Bearer',
+            'expires_in' => $expiresIn,
+        ])->cookie(
+            'access_token',
+            $result['token'],
+            $expiresIn / 60,
+            '/',
+            null,
+            true,
+            true,
+            false,
+            'Lax'
+        );
+    }
+
+    public function refresh()
+    {
+        $result = $this->authService->refresh();
+        $expiresIn = Auth::factory()->getTTL() * 60;
+
+        return response()->json([
+            'user' => new UserResource($result['user']),
+            'access_token' => $result['token'],
+            'token_type' => 'Bearer',
+            'expires_in' => $expiresIn,
+        ])->cookie(
+            'access_token',
+            $result['token'],
+            $expiresIn / 60,
+            '/',
+            null,
+            true,
+            true,
+            false,
+            'Lax'
+        );
+    }
+
+    public function signout()
+    {
+        try {
+            $token = auth()->getToken(); // otomatis ambil dari header / cookie
+            if ($token) {
+                auth()->invalidate($token); // blacklist token
+            }
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            // ignore
         }
+
+        return response()->json(['message' => 'Successfully logged out'])
+            ->cookie('access_token', '', -1, '/', null, true, true);
     }
 
     public function me()
     {
         return response()->json(new UserResource($this->authService->me()));
-    }
-
-    public function signout()
-    {
-        $this->authService->logout();
-        return response()->json(['message' => 'Successfully logged out']);
-    }
-
-    public function refresh()
-    {
-        try {
-            $result = $this->authService->refresh();
-
-            return response()->json([
-                'user' => new UserResource($result['user']),
-                'access_token' => $result['token'],
-                'token_type' => 'Bearer',
-                'expires_in' => Auth::factory()->getTTL() * 60,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
     }
 }

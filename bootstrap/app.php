@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->group('api', [
             \App\Http\Middleware\ForceJsonResponse::class,
+            \App\Http\Middleware\AttachJwtFromCookie::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
